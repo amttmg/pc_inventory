@@ -100,16 +100,104 @@ $computers = $computers_stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @media print {
+            @page {
+                size: landscape;
+            }
+
+            /* Hide all buttons and forms during print */
+            .btn,
+            form,
+            .dataTables_length,
+            .dataTables_filter,
+            .dataTables_info,
+            .dataTables_paginate {
+                display: none !important;
+            }
+
+            /* Hide "Actions" column */
+            th:last-child,
+            td:last-child {
+                display: none !important;
+            }
+
+            /* Optional: Adjust table layout for printing */
+            table {
+                border: 1px solid #000 !important;
+                border-collapse: collapse !important;
+                width: 100% !important;
+                font-size: 12pt;
+            }
+
+            table th,
+            table td {
+                border: 1px solid #000 !important;
+                padding: 8px !important;
+            }
+
+            /* Optional: Hide modal */
+            .modal {
+                display: none !important;
+            }
+
+            .print-footer {
+                display: block !important;
+                position: fixed;
+                bottom: 50px;
+                left: 0;
+                right: 0;
+                padding: 0 40px;
+            }
+        }
+
+        /* Improve table design in normal view */
+        #computersTable thead th {
+            background-color: #f8f9fa;
+            text-align: center;
+        }
+
+        #computersTable td {
+            vertical-align: middle;
+        }
+
+        /* Center the page title */
+        h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            font-weight: bold;
+        }
+
+        /* Add subtle box shadow to the table */
+        #computersTable {
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        .print-footer {
+            display: none;
+        }
+    </style>
+
 </head>
 
 <body>
     <div class="container-fluid mt-4">
         <div class="row">
             <div class="col">
-                <h2><?= htmlspecialchars($branch['name']) ?> - Computer Inventory</h2>
-                <button class="btn btn-primary mb-3" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
-                    <i class="fas fa-plus"></i> Add New Computer
-                </button>
+                <div class="mb-3 text-center position-relative">
+                    <h2 class="mb-0"><?= htmlspecialchars($branch['name']) ?> - Computer Inventory</h2>
+                    <a href="logout.php" class="position-absolute top-0 end-0 mt-1 me-2 text-danger" title="Logout" style="font-size: 1.5rem;">
+                        <i class="fas fa-sign-out-alt"></i>
+                    </a>
+                </div>
+                <div class="my-3">
+                    <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
+                        <i class="fas fa-plus"></i> Add New Computer
+                    </button>
+                    <button class="btn btn-secondary" onclick="window.print()">
+                        <i class="fas fa-print"></i> Print Page
+                    </button>
+                </div>
 
                 <table id="computersTable" class="table table-striped table-bordered">
                     <thead>
@@ -140,7 +228,7 @@ $computers = $computers_stmt->fetchAll();
                                 </td>
                                 <td><?= htmlspecialchars($computer['status']) ?></td>
                                 <td>
-                                    <button class="btn btn-sm btn-warning edit-btn"
+                                    <button class="btn btn-sm btn-primary edit-btn"
                                         data-id="<?= $computer['computer_id'] ?>"
                                         data-asset-tag="<?= htmlspecialchars($computer['asset_tag']) ?>"
                                         data-type-id="<?= $computer['type_id'] ?>"
@@ -153,13 +241,13 @@ $computers = $computers_stmt->fetchAll();
                                         data-os="<?= htmlspecialchars($computer['os']) ?>"
                                         data-status="<?= htmlspecialchars($computer['status']) ?>"
                                         data-notes="<?= htmlspecialchars($computer['notes']) ?>">
-                                        <i class="fas fa-edit"></i> Edit
+                                        <i class="fas fa-edit"></i>
                                     </button>
                                     <form method="POST" style="display:inline;">
                                         <input type="hidden" name="delete_id" value="<?= $computer['computer_id'] ?>">
                                         <button type="submit" class="btn btn-sm btn-danger"
                                             onclick="return confirm('Are you sure?')">
-                                            <i class="fas fa-trash"></i> Delete
+                                            <i class="fas fa-trash"></i>
                                         </button>
                                     </form>
                                 </td>
@@ -170,6 +258,20 @@ $computers = $computers_stmt->fetchAll();
             </div>
         </div>
     </div>
+    <div class="print-footer">
+        <div style="display: flex; justify-content: space-between; margin-top: 100px;">
+            <div style="text-align: center;">
+                <p>______________________________</p>
+                <p>IT Focal Person</p>
+            </div>
+            <div style="text-align: center;">
+                <p>______________________________</p>
+                <p>Branch Manager</p>
+            </div>
+        </div>
+    </div>
+
+
 
     <!-- Computer Modal -->
     <div class="modal fade" id="computerModal" tabindex="-1" aria-labelledby="computerModalLabel" aria-hidden="true">
