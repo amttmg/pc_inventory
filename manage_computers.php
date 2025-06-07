@@ -112,6 +112,9 @@ $computers = $computers_stmt->fetchAll();
             .dataTables_length,
             .dataTables_filter,
             .dataTables_info,
+            .btn-icon,
+            .sorting::after,
+            .sorting::before,
             .dataTables_paginate {
                 display: none !important;
             }
@@ -185,8 +188,8 @@ $computers = $computers_stmt->fetchAll();
         <div class="row">
             <div class="col">
                 <div class="mb-3 text-center position-relative">
-                    <h2 class="mb-0"><?= htmlspecialchars($branch['name']) ?> - Computer Inventory</h2>
-                    <a href="logout.php" class="position-absolute top-0 end-0 mt-1 me-2 text-danger" title="Logout" style="font-size: 1.5rem;">
+                    <h2 class="mb-0"><?= htmlspecialchars($branch['name'] . '(' . $branch['code'] . ')') ?> - Computer Inventory</h2>
+                    <a href="logout.php" class="btn-icon position-absolute top-0 end-0 mt-1 me-2 text-danger" title="Logout" style="font-size: 1.5rem;">
                         <i class="fas fa-sign-out-alt"></i>
                     </a>
                 </div>
