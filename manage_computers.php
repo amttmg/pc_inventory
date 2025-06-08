@@ -73,15 +73,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 status = :status,
                 notes = :notes");
         }
-
         $stmt->execute($data);
     }
-
-    header("Location: manage_computers.php");
-    exit();
 }
 
-// Get computers for this branch
+// Get current step from URL
+$current_step = isset($_GET['step']) ? $_GET['step'] : '1';
+
+// Get computers from database for step 2
 $computers_stmt = $pdo->prepare("
     SELECT c.*, ct.type_name 
     FROM computers c
@@ -89,7 +88,7 @@ $computers_stmt = $pdo->prepare("
     WHERE c.branch_id = ?
 ");
 $computers_stmt->execute([$branch['id']]);
-$computers = $computers_stmt->fetchAll();
+$db_computers = $computers_stmt->fetchAll();
 ?>
 
 <!DOCTYPE html>
@@ -100,61 +99,99 @@ $computers = $computers_stmt->fetchAll();
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.11.5/css/dataTables.bootstrap5.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
     <style>
-        @media print {
-            @page {
-                size: landscape;
-            }
-
-            /* Hide all buttons and forms during print */
-            .btn,
-            form,
-            .dataTables_length,
-            .dataTables_filter,
-            .dataTables_info,
-            .btn-icon,
-            .sorting::after,
-            .sorting::before,
-            .dataTables_paginate {
-                display: none !important;
-            }
-
-            /* Hide "Actions" column */
-            th:last-child,
-            td:last-child {
-                display: none !important;
-            }
-
-            /* Optional: Adjust table layout for printing */
-            table {
-                border: 1px solid #000 !important;
-                border-collapse: collapse !important;
-                width: 100% !important;
-                font-size: 12pt;
-            }
-
-            table th,
-            table td {
-                border: 1px solid #000 !important;
-                padding: 8px !important;
-            }
-
-            /* Optional: Hide modal */
-            .modal {
-                display: none !important;
-            }
-
-            .print-footer {
-                display: block !important;
-                position: fixed;
-                bottom: 50px;
-                left: 0;
-                right: 0;
-                padding: 0 40px;
-            }
+        /* Step form styles */
+        .step-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
         }
 
-        /* Improve table design in normal view */
+        .step-indicator {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+            position: relative;
+        }
+
+        .step-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+            flex: 1;
+        }
+
+        .step-item:not(:last-child)::after {
+            content: '';
+            position: absolute;
+            top: 15px;
+            left: 60%;
+            width: 80%;
+            height: 2px;
+            background-color: #e9ecef;
+            z-index: 1;
+        }
+
+        .step-circle {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #6c757d;
+            position: relative;
+            z-index: 2;
+            transition: all 0.3s ease;
+        }
+
+        .step-circle.active {
+            background-color: #0d6efd;
+            color: white;
+            box-shadow: 0 0 0 6px rgba(13, 110, 253, 0.2);
+        }
+
+        .step-circle.completed {
+            background-color: #198754;
+            color: white;
+        }
+
+        .step-title {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #6c757d;
+            text-align: center;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .step-title.active {
+            color: #0d6efd;
+            font-weight: 600;
+        }
+
+        .step-title.completed {
+            color: #198754;
+        }
+
+        /* Step content styles */
+        .step-content {
+            display: none;
+            animation: fadeIn 0.5s ease;
+        }
+
+        .step-content.active {
+            display: block;
+        }
+
+        /* Table styles */
         #computersTable thead th {
             background-color: #f8f9fa;
             text-align: center;
@@ -164,112 +201,395 @@ $computers = $computers_stmt->fetchAll();
             vertical-align: middle;
         }
 
-        /* Center the page title */
-        h2 {
-            text-align: center;
-            margin-bottom: 20px;
-            font-weight: bold;
-        }
-
-        /* Add subtle box shadow to the table */
         #computersTable {
-            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.05);
         }
 
-        .print-footer {
-            display: none;
+        /* Form styles */
+        .form-control:focus,
+        .form-select:focus {
+            box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.15);
+            border-color: #86b7fe;
+        }
+
+        /* File upload styles */
+        .file-upload {
+            border: 2px dashed #dee2e6;
+            border-radius: 5px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-bottom: 20px;
+        }
+
+        .file-upload:hover {
+            border-color: #0d6efd;
+            background-color: #f8f9fa;
+        }
+
+        .file-upload i {
+            font-size: 2.5rem;
+            color: #6c757d;
+            margin-bottom: 10px;
+        }
+
+        .file-name {
+            margin-top: 10px;
+            font-size: 0.9rem;
+            color: #495057;
+        }
+
+        /* Summary card styles */
+        .summary-card {
+            border-left: 4px solid #0d6efd;
+            margin-bottom: 15px;
+        }
+
+        .summary-card .card-body {
+            padding: 15px;
+        }
+
+        /* Button styles */
+        .btn-action {
+            margin-right: 5px;
+            margin-bottom: 5px;
+        }
+
+        /* Animations */
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Completion page */
+        .completion-page {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .completion-icon {
+            font-size: 5rem;
+            color: #198754;
+            margin-bottom: 20px;
         }
     </style>
-
 </head>
 
-<body>
-    <div class="container-fluid mt-4">
-        <div class="row">
-            <div class="col">
-                <div class="mb-3 text-center position-relative">
-                    <h2 class="mb-0"><?= htmlspecialchars($branch['name'] . '(' . $branch['code'] . ')') ?> - Computer Inventory</h2>
-                    <a href="logout.php" class="btn-icon position-absolute top-0 end-0 mt-1 me-2 text-danger" title="Logout" style="font-size: 1.5rem;">
-                        <i class="fas fa-sign-out-alt"></i>
-                    </a>
+<body class="bg-light">
+    <div class="container py-5">
+        <?php if ($current_step === 'complete'): ?>
+            <!-- Completion Page -->
+            <div class="step-container">
+                <div class="completion-page">
+                    <i class="fas fa-check-circle completion-icon"></i>
+                    <h2 class="mb-3">Submission Complete!</h2>
+                    <p class="lead">Your computers have been successfully added to the inventory.</p>
+                    <div class="mt-4">
+                        <a href="manage_computers.php?step=1" class="btn btn-primary me-2">
+                            <i class="fas fa-plus me-2"></i>Add More Computers
+                        </a>
+                        <a href="dashboard.php" class="btn btn-outline-secondary">
+                            <i class="fas fa-tachometer-alt me-2"></i>Return to Dashboard
+                        </a>
+                    </div>
                 </div>
-                <div class="my-3">
-                    <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
-                        <i class="fas fa-plus"></i> Add New Computer
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.print()">
-                        <i class="fas fa-print"></i> Print Page
-                    </button>
+            </div>
+        <?php else: ?>
+            <!-- Step Form Container -->
+            <div class="step-container">
+                <!-- Step Indicators -->
+                <div class="step-indicator px-3 py-5">
+                    <div class="step-item">
+                        <div class="step-circle <?= $current_step === '1' ? 'active' : ($current_step > '1' ? 'completed' : '') ?>">1</div>
+                        <div class="step-title <?= $current_step === '1' ? 'active' : ($current_step > '1' ? 'completed' : '') ?>">Instructions</div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-circle <?= $current_step === '2' ? 'active' : ($current_step > '2' ? 'completed' : '') ?>">2</div>
+                        <div class="step-title <?= $current_step === '2' ? 'active' : ($current_step > '2' ? 'completed' : '') ?>">Add Computers</div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-circle <?= $current_step === '3' ? 'active' : '' ?>">3</div>
+                        <div class="step-title <?= $current_step === '3' ? 'active' : '' ?>">Review & Submit</div>
+                    </div>
                 </div>
 
-                <table id="computersTable" class="table table-striped table-bordered">
-                    <thead>
-                        <tr>
-                            <th>Asset Tag</th>
-                            <th>Type</th>
-                            <th>Computer Name</th>
-                            <th>Brand/Model</th>
-                            <th>Specs</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php foreach ($computers as $computer): ?>
-                            <tr>
-                                <td><?= htmlspecialchars($computer['asset_tag']) ?></td>
-                                <td><?= htmlspecialchars($computer['type_name']) ?></td>
-                                <td><?= htmlspecialchars($computer['computer_name']) ?></td>
-                                <td>
-                                    <?= htmlspecialchars($computer['brand']) ?>
-                                    <?= $computer['model'] ? ' / ' . htmlspecialchars($computer['model']) : '' ?>
-                                </td>
-                                <td>
-                                    <?= htmlspecialchars($computer['processor']) ?><br>
-                                    RAM: <?= htmlspecialchars($computer['ram']) ?><br>
-                                    Storage: <?= htmlspecialchars($computer['storage']) ?>
-                                </td>
-                                <td><?= htmlspecialchars($computer['status']) ?></td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary edit-btn"
-                                        data-id="<?= $computer['computer_id'] ?>"
-                                        data-asset-tag="<?= htmlspecialchars($computer['asset_tag']) ?>"
-                                        data-type-id="<?= $computer['type_id'] ?>"
-                                        data-brand="<?= htmlspecialchars($computer['brand']) ?>"
-                                        data-model="<?= htmlspecialchars($computer['model']) ?>"
-                                        data-computer-name="<?= htmlspecialchars($computer['computer_name']) ?>"
-                                        data-processor="<?= htmlspecialchars($computer['processor']) ?>"
-                                        data-ram="<?= htmlspecialchars($computer['ram']) ?>"
-                                        data-storage="<?= htmlspecialchars($computer['storage']) ?>"
-                                        data-os="<?= htmlspecialchars($computer['os']) ?>"
-                                        data-status="<?= htmlspecialchars($computer['status']) ?>"
-                                        data-notes="<?= htmlspecialchars($computer['notes']) ?>">
-                                        <i class="fas fa-edit"></i>
+                <!-- Step 1: Instructions -->
+                <div class="step-content <?= $current_step === '1' ? 'active' : '' ?>" id="step1">
+                    <div class="row">
+                        <div class="col-lg-8 mx-auto">
+                            <div class="text-center mb-5">
+                                <h2 class="mb-3">Computer Inventory Management</h2>
+                                <p class="lead">Follow these steps to add computers to your branch inventory</p>
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>Instructions</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ol class="mb-0">
+                                        <li class="mb-2">Review the requirements and gather necessary information</li>
+                                        <li class="mb-2">Add computers one by one in the next step</li>
+                                        <li class="mb-2">Edit or remove computers as needed</li>
+                                        <li class="mb-2">Review all information before final submission</li>
+                                        <li>Upload any supporting documents with your submission</li>
+                                    </ol>
+                                </div>
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-list-check me-2"></i>Requirements</h5>
+                                </div>
+                                <div class="card-body">
+                                    <ul class="mb-0">
+                                        <li class="mb-2"><strong>Asset Tag:</strong> Unique identifier for each computer</li>
+                                        <li class="mb-2"><strong>Computer Type:</strong> Desktop, Laptop, Server, etc.</li>
+                                        <li class="mb-2"><strong>Basic Specifications:</strong> Processor, RAM, Storage</li>
+                                        <li class="mb-2"><strong>Status:</strong> Operational, Maintenance, Retired, etc.</li>
+                                        <li><strong>Supporting Documents:</strong> Optional purchase receipts or warranty info</li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <div class="text-center mt-4">
+                                <a href="manage_computers.php?step=2" class="btn btn-primary btn-lg px-5">
+                                    Get Started <i class="fas fa-arrow-right ms-2"></i>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Add Computers -->
+                <div class="step-content <?= $current_step === '2' ? 'active' : '' ?>" id="step2">
+                    <div class="d-flex justify-content-between align-items-center mb-4">
+
+                        <div class="w-100 d-flex justify-content-between align-items-center">
+                            <button class="btn btn-success" data-bs-toggle="modal" data-bs-target="#addComputerModal">
+                                <i class="fas fa-plus me-2"></i>Add Computer
+                            </button>
+
+                            <a href="manage_computers.php?step=3" class="btn btn-primary">
+                                Review & Submit <i class="fas fa-arrow-right ms-2"></i>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Entered Inventory Computers</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table id="computersTable" class="table table-striped table-bordered">
+                                    <thead>
+                                        <tr>
+                                            <th>Asset Tag</th>
+                                            <th>Type</th>
+                                            <th>Computer Name</th>
+                                            <th>Brand/Model</th>
+                                            <th>Specs</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <?php foreach ($db_computers as $computer): ?>
+                                            <tr>
+                                                <td><?= htmlspecialchars($computer['asset_tag']) ?></td>
+                                                <td><?= htmlspecialchars($computer['type_name']) ?></td>
+                                                <td><?= htmlspecialchars($computer['computer_name']) ?></td>
+                                                <td>
+                                                    <?= htmlspecialchars($computer['brand']) ?>
+                                                    <?= $computer['model'] ? ' / ' . htmlspecialchars($computer['model']) : '' ?>
+                                                </td>
+                                                <td>
+                                                    <?= htmlspecialchars($computer['processor']) ?><br>
+                                                    RAM: <?= htmlspecialchars($computer['ram']) ?><br>
+                                                    Storage: <?= htmlspecialchars($computer['storage']) ?>
+                                                </td>
+                                                <td><?= htmlspecialchars($computer['status']) ?></td>
+                                                <td>
+                                                    <button class="btn btn-sm btn-primary edit-btn"
+                                                        data-id="<?= $computer['computer_id'] ?>"
+                                                        data-asset-tag="<?= htmlspecialchars($computer['asset_tag']) ?>"
+                                                        data-type-id="<?= $computer['type_id'] ?>"
+                                                        data-brand="<?= htmlspecialchars($computer['brand']) ?>"
+                                                        data-model="<?= htmlspecialchars($computer['model']) ?>"
+                                                        data-computer-name="<?= htmlspecialchars($computer['computer_name']) ?>"
+                                                        data-processor="<?= htmlspecialchars($computer['processor']) ?>"
+                                                        data-ram="<?= htmlspecialchars($computer['ram']) ?>"
+                                                        data-storage="<?= htmlspecialchars($computer['storage']) ?>"
+                                                        data-os="<?= htmlspecialchars($computer['os']) ?>"
+                                                        data-status="<?= htmlspecialchars($computer['status']) ?>"
+                                                        data-notes="<?= htmlspecialchars($computer['notes']) ?>">
+                                                        <i class="fas fa-edit"></i>
+                                                    </button>
+                                                    <form method="POST" style="display:inline;">
+                                                        <input type="hidden" name="delete_id" value="<?= $computer['computer_id'] ?>">
+                                                        <button type="submit" class="btn btn-sm btn-danger"
+                                                            onclick="return confirm('Are you sure?')">
+                                                            <i class="fas fa-trash"></i>
+                                                        </button>
+                                                    </form>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Step 3: Review & Submit -->
+                <div class="step-content <?= $current_step === '3' ? 'active' : '' ?>" id="step3">
+                    <div class="row">
+                        <div class="col-lg-10 mx-auto">
+                            <div class="text-center mb-5">
+                                <h2 class="mb-3">Review & Submit</h2>
+                                <p class="lead">Please review all computers before final submission</p>
+                            </div>
+
+
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-paperclip me-2"></i>Supporting Documents</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <label class="form-label">Upload Supporting Documents (Optional)</label>
+                                        <div class="file-upload" onclick="document.getElementById('fileInput').click()">
+                                            <i class="bi bi-cloud-arrow-up"></i>
+                                            <p>Click to upload or drag and drop</p>
+                                            <p class="text-muted">PDF, JPG, PNG up to 5MB</p>
+                                            <div class="file-name" id="fileName"></div>
+                                        </div>
+                                        <input type="file" id="fileInput" name="document" style="display: none;" accept=".pdf,.jpg,.jpeg,.png">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="card mb-4">
+                                <div class="card-header bg-primary text-white">
+                                    <h5 class="mb-0"><i class="fas fa-check-circle me-2"></i>Confirmation</h5>
+                                </div>
+                                <div class="card-body">
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox" id="confirmation" required>
+                                        <label class="form-check-label" for="confirmation">
+                                            I confirm that all information provided is accurate and complete
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-flex justify-content-between mt-4">
+                                <a href="manage_computers.php?step=2" class="btn btn-outline-secondary px-4">
+                                    <i class="fas fa-arrow-left me-2"></i>Back
+                                </a>
+                                <form method="POST" enctype="multipart/form-data" class="d-inline">
+                                    <input type="hidden" name="final_submit" value="1">
+                                    <button type="submit" class="btn btn-success px-4" id="submitBtn" disabled>
+                                        <i class="fas fa-check-circle me-2"></i>Submit All Computers
                                     </button>
-                                    <form method="POST" style="display:inline;">
-                                        <input type="hidden" name="delete_id" value="<?= $computer['computer_id'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Are you sure?')">
-                                            <i class="fas fa-trash"></i>
-                                        </button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    </tbody>
-                </table>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+        <?php endif; ?>
     </div>
-    <div class="print-footer">
-        <div style="display: flex; justify-content: space-between; margin-top: 100px;">
-            <div style="text-align: center;">
-                <p>______________________________</p>
-                <p>IT Focal Person</p>
-            </div>
-            <div style="text-align: center;">
-                <p>______________________________</p>
-                <p>Branch Manager</p>
+
+    <!-- Add Computer Modal -->
+    <div class="modal fade" id="addComputerModal" tabindex="-1" aria-labelledby="addComputerModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <form method="POST">
+                    <input type="hidden" name="add_computer" value="1">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="addComputerModalLabel">Add New Computer</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Asset Tag *</label>
+                                <input type="text" class="form-control" name="asset_tag" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Computer Type *</label>
+                                <select class="form-select" name="type_id" required>
+                                    <option value="">Select Type</option>
+                                    <?php foreach ($types as $type): ?>
+                                        <option value="<?= $type['type_id'] ?>"><?= htmlspecialchars($type['type_name']) ?></option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Brand</label>
+                                <input type="text" class="form-control" name="brand">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Model</label>
+                                <input type="text" class="form-control" name="model">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Computer Name</label>
+                                <input type="text" class="form-control" name="computer_name">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Processor</label>
+                                <input type="text" class="form-control" name="processor">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">RAM</label>
+                                <input type="text" class="form-control" name="ram">
+                            </div>
+                            <div class="col-md-4">
+                                <label class="form-label">Storage</label>
+                                <input type="text" class="form-control" name="storage">
+                            </div>
+                        </div>
+
+                        <div class="row mb-3">
+                            <div class="col-md-6">
+                                <label class="form-label">Operating System</label>
+                                <input type="text" class="form-control" name="os">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">Status</label>
+                                <input type="text" class="form-control" name="status">
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label">Notes</label>
+                            <textarea class="form-control" name="notes" rows="3"></textarea>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Add Computer</button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -370,7 +690,7 @@ $computers = $computers_stmt->fetchAll();
             // Initialize DataTable
             $('#computersTable').DataTable();
 
-            // Edit button handler - Now using data attributes
+            // Edit button handler
             $('.edit-btn').click(function() {
                 var modal = $('#computerModal');
 
@@ -394,13 +714,146 @@ $computers = $computers_stmt->fetchAll();
                 // Show modal
                 modal.modal('show');
             });
+
+            // File upload display
+            $('#fileInput').change(function() {
+                if (this.files.length > 0) {
+                    $('#fileName').text(this.files[0].name);
+                } else {
+                    $('#fileName').text('');
+                }
+            });
+
+            // Drag and drop for file upload
+            $('.file-upload').on('dragover', function(e) {
+                e.preventDefault();
+                $(this).css('border-color', '#0d6efd');
+                $(this).css('background-color', '#f8f9fa');
+            });
+
+            $('.file-upload').on('dragleave', function(e) {
+                e.preventDefault();
+                $(this).css('border-color', '#dee2e6');
+                $(this).css('background-color', '');
+            });
+
+            $('.file-upload').on('drop', function(e) {
+                e.preventDefault();
+                $(this).css('border-color', '#dee2e6');
+                $(this).css('background-color', '');
+
+                if (e.originalEvent.dataTransfer.files.length) {
+                    $('#fileInput')[0].files = e.originalEvent.dataTransfer.files;
+                    $('#fileName').text(e.originalEvent.dataTransfer.files[0].name);
+                }
+            });
         });
 
         // Reset form when adding new computer
         function resetForm() {
             $('#computerModal form')[0].reset();
             $('#computer_id').val('');
+            $('#fileName').text('');
             $('#computerModalLabel').text('Add New Computer');
+            currentStep = 0;
+            showStep(currentStep);
+        }
+
+        // Step form functionality
+        let currentStep = 0;
+        const steps = $('.step');
+        const stepIndicators = $('.step-circle');
+        const stepTitles = $('.step-title');
+
+        $('#nextBtn').click(function() {
+            if (validateStep(currentStep)) {
+                if (currentStep < steps.length - 1) {
+                    currentStep++;
+                    showStep(currentStep);
+
+                    // If moving to final step, update review section
+                    if (currentStep === 2) {
+                        updateReviewSection();
+                    }
+                } else {
+                    // Submit the form when on last step
+                    if ($('#confirmation').is(':checked')) {
+                        $('#computerModal form').submit();
+                    } else {
+                        alert('Please confirm that all information is accurate');
+                    }
+                }
+            }
+        });
+
+        $('#prevBtn').click(function() {
+            if (currentStep > 0) {
+                currentStep--;
+                showStep(currentStep);
+            }
+        });
+
+        function showStep(stepIndex) {
+            // Hide all steps
+            steps.removeClass('active');
+
+            // Show current step
+            $(steps[stepIndex]).addClass('active');
+
+            // Update button states
+            $('#prevBtn').prop('disabled', stepIndex === 0);
+
+            if (stepIndex === steps.length - 1) {
+                $('#nextBtn').html('Submit <i class="bi bi-check-circle ms-2"></i>');
+            } else {
+                $('#nextBtn').html('Next <i class="bi bi-arrow-right ms-2"></i>');
+            }
+
+            // Update step indicators
+            stepIndicators.removeClass('active completed');
+            stepTitles.removeClass('active completed');
+
+            stepIndicators.each(function(index) {
+                if (index < stepIndex) {
+                    $(this).addClass('completed');
+                    $(stepTitles[index]).addClass('completed');
+                } else if (index === stepIndex) {
+                    $(this).addClass('active');
+                    $(stepTitles[index]).addClass('active');
+                }
+            });
+        }
+
+        function validateStep(stepIndex) {
+            let isValid = true;
+
+            // Validate step 1 (no validation needed for instructions)
+
+            // Validate step 2 (computer details)
+            if (stepIndex === 1) {
+                if ($('#asset_tag').val().trim() === '') {
+                    alert('Asset Tag is required');
+                    isValid = false;
+                }
+
+                if ($('#type_id').val() === '') {
+                    alert('Computer Type is required');
+                    isValid = false;
+                }
+            }
+
+            return isValid;
+        }
+
+        function updateReviewSection() {
+            $('#review_asset_tag').text($('#asset_tag').val());
+            $('#review_type').text($('#type_id option:selected').text());
+            $('#review_brand_model').text($('#brand').val() + ($('#model').val() ? ' / ' + $('#model').val() : ''));
+            $('#review_name').text($('#computer_name').val());
+            $('#review_processor').text($('#processor').val());
+            $('#review_ram').text($('#ram').val());
+            $('#review_storage').text($('#storage').val());
+            $('#review_status').text($('#status').val());
         }
     </script>
 </body>
