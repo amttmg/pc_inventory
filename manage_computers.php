@@ -187,18 +187,24 @@ $computers = $computers_stmt->fetchAll();
     <div class="container-fluid mt-4">
         <div class="row">
             <div class="col">
-                <div class="mb-3 text-center position-relative">
+                <div class="mb-5 text-center position-relative">
                     <h2 class="mb-0"><?= htmlspecialchars($branch['name'] . '(' . $branch['code'] . ')') ?> - Computer Inventory</h2>
                     <a href="logout.php" class="btn-icon position-absolute top-0 end-0 mt-1 me-2 text-danger" title="Logout" style="font-size: 1.5rem;">
                         <i class="fas fa-sign-out-alt"></i>
                     </a>
                 </div>
-                <div class="my-3">
-                    <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
-                        <i class="fas fa-plus"></i> Add New Computer
-                    </button>
-                    <button class="btn btn-secondary" onclick="window.print()">
-                        <i class="fas fa-print"></i> Print Page
+                <hr>
+                <div class="my-3 d-flex justify-content-between align-items-center mb-5">
+                    <div>
+                        <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
+                            <i class="fas fa-plus"></i> Add New Computer
+                        </button>
+                        <button class="btn btn-secondary" onclick="window.print()">
+                            <i class="fas fa-print"></i> Print Page
+                        </button>
+                    </div>
+                    <button class="btn btn-success" onclick="window.location.href='review_submit.php'">
+                        <i class="fas fa-arrow-right"></i> Final Submit
                     </button>
                 </div>
 
