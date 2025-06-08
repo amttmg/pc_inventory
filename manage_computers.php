@@ -194,20 +194,27 @@ $computers = $computers_stmt->fetchAll();
                     </a>
                 </div>
                 <hr>
-                <div class="my-3 d-flex justify-content-between align-items-center mb-5">
-                    <div>
-                        <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
-                            <i class="fas fa-plus"></i> Add New Computer
-                        </button>
-                        <button class="btn btn-secondary" onclick="window.print()">
-                            <i class="fas fa-print"></i> Print Page
+                <?php if (!$branch['submitted_at']) { ?>
+                    <div class="my-3 d-flex justify-content-between align-items-center mb-5">
+                        <div>
+                            <button class="btn btn-primary me-2" onclick="resetForm()" data-bs-toggle="modal" data-bs-target="#computerModal">
+                                <i class="fas fa-plus"></i> Add New Computer
+                            </button>
+                            <button class="btn btn-secondary" onclick="window.print()">
+                                <i class="fas fa-print"></i> Print Page
+                            </button>
+                        </div>
+                        <button class="btn btn-success" onclick="window.location.href='review_submit.php'">
+                            <i class="fas fa-arrow-right"></i> Final Submit
                         </button>
                     </div>
-                    <button class="btn btn-success" onclick="window.location.href='review_submit.php'">
-                        <i class="fas fa-arrow-right"></i> Final Submit
-                    </button>
-                </div>
+                <?php } else { ?>
+                    <div class="alert alert-success alert-dismissible fade show text-center" role="alert">
+                        We appreciate your submission! The inventory was successfully submitted on <?php echo $branch['submitted_at'] ?>
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
 
+                <?php } ?>
                 <table id="computersTable" class="table table-striped table-bordered">
                     <thead>
                         <tr>
@@ -217,7 +224,9 @@ $computers = $computers_stmt->fetchAll();
                             <th>Brand/Model</th>
                             <th>Specs</th>
                             <th>Status</th>
-                            <th>Actions</th>
+                            <?php if (!$branch['submitted_at']) { ?>
+                                <th>Actions</th>
+                            <?php } ?>
                         </tr>
                     </thead>
                     <tbody>
@@ -236,30 +245,32 @@ $computers = $computers_stmt->fetchAll();
                                     Storage: <?= htmlspecialchars($computer['storage']) ?>
                                 </td>
                                 <td><?= htmlspecialchars($computer['status']) ?></td>
-                                <td>
-                                    <button class="btn btn-sm btn-primary edit-btn"
-                                        data-id="<?= $computer['computer_id'] ?>"
-                                        data-asset-tag="<?= htmlspecialchars($computer['asset_tag']) ?>"
-                                        data-type-id="<?= $computer['type_id'] ?>"
-                                        data-brand="<?= htmlspecialchars($computer['brand']) ?>"
-                                        data-model="<?= htmlspecialchars($computer['model']) ?>"
-                                        data-computer-name="<?= htmlspecialchars($computer['computer_name']) ?>"
-                                        data-processor="<?= htmlspecialchars($computer['processor']) ?>"
-                                        data-ram="<?= htmlspecialchars($computer['ram']) ?>"
-                                        data-storage="<?= htmlspecialchars($computer['storage']) ?>"
-                                        data-os="<?= htmlspecialchars($computer['os']) ?>"
-                                        data-status="<?= htmlspecialchars($computer['status']) ?>"
-                                        data-notes="<?= htmlspecialchars($computer['notes']) ?>">
-                                        <i class="fas fa-edit"></i>
-                                    </button>
-                                    <form method="POST" style="display:inline;">
-                                        <input type="hidden" name="delete_id" value="<?= $computer['computer_id'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-danger"
-                                            onclick="return confirm('Are you sure?')">
-                                            <i class="fas fa-trash"></i>
+                                <?php if (!$branch['submitted_at']) { ?>
+                                    <td>
+                                        <button class="btn btn-sm btn-primary edit-btn"
+                                            data-id="<?= $computer['computer_id'] ?>"
+                                            data-asset-tag="<?= htmlspecialchars($computer['asset_tag']) ?>"
+                                            data-type-id="<?= $computer['type_id'] ?>"
+                                            data-brand="<?= htmlspecialchars($computer['brand']) ?>"
+                                            data-model="<?= htmlspecialchars($computer['model']) ?>"
+                                            data-computer-name="<?= htmlspecialchars($computer['computer_name']) ?>"
+                                            data-processor="<?= htmlspecialchars($computer['processor']) ?>"
+                                            data-ram="<?= htmlspecialchars($computer['ram']) ?>"
+                                            data-storage="<?= htmlspecialchars($computer['storage']) ?>"
+                                            data-os="<?= htmlspecialchars($computer['os']) ?>"
+                                            data-status="<?= htmlspecialchars($computer['status']) ?>"
+                                            data-notes="<?= htmlspecialchars($computer['notes']) ?>">
+                                            <i class="fas fa-edit"></i>
                                         </button>
-                                    </form>
-                                </td>
+                                        <form method="POST" style="display:inline;">
+                                            <input type="hidden" name="delete_id" value="<?= $computer['computer_id'] ?>">
+                                            <button type="submit" class="btn btn-sm btn-danger"
+                                                onclick="return confirm('Are you sure?')">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                        </form>
+                                    </td>
+                                <?php } ?>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
