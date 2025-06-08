@@ -121,7 +121,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_FILES['signature_file'])) {
                 <ol>
                     <li>Please review all computer entries carefully before final submission</li>
                     <li>Once submitted, you won't be able to make changes without contacting IT department</li>
-                    <li>Upload a signed copy of the inventory (scan or photo)</li>
+                    <li>Upload a signed copy of the inventory (scan or photo) of printed from previous step.</li>
                     <li>Click "Submit Inventory" button to complete the process</li>
                 </ol>
             </div>
